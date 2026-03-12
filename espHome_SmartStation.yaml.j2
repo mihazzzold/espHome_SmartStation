@@ -1,0 +1,98 @@
+{% set device_name = serial_number | default("espHome-SmartStation") %}
+{% set friendly_name = ("espHome SmartStation #" ~ serial_number) | default("espHome SmartStation") %}
+{% set firmware_version = "1.0.0" %}
+
+esphome:
+  name: "{{ device_name }}"
+  friendly_name: "{{ friendly_name }}"
+  project:
+    name: "mihazzz123.espHome-SmartStation"
+    version: "${firmware_version}"
+
+esp32:
+  board: {{ board | default("esp32-c3-devkitm-1") }}
+  variant: esp32c3
+  framework:
+    type: arduino
+
+wifi:
+  ap:
+    ssid: "{{ device_name }}-setup"
+    password: !secret ap_password
+  reboot_timeout: 0s
+
+captive_portal:
+
+logger:
+  level: INFO
+  baud_rate: 0
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# Настройка I2S аудио (Общий порт для входа и выхода на ESP32-C3)
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: {{ speaker_lrclk | default("GPIO3") }}
+    i2s_bclk_pin: {{ speaker_bclk | default("GPIO2") }}
+
+# Динамик (ЦАП PCM5102A)
+speaker:
+  - platform: i2s_audio
+    id: speaker_id
+    i2s_audio_id: i2s_bus
+    i2s_dout_pin: {{ speaker_dout | default("GPIO1") }}
+    dac_type: external
+    # PCM5102A не требует MCLK (может генерировать его сам из BCLK)
+
+# Микрофон (INMP441)
+microphone:
+  - platform: i2s_audio
+    id: microphone_id
+    i2s_audio_id: i2s_bus
+    i2s_din_pin: {{ mic_din | default("GPIO6") }}
+    adc_type: external
+    pdm: false
+    # INMP441 работает в обычном режиме I2S, используя общие шины BCK/LRCK с ЦАП
+
+# Голосовой ассистент
+voice_assistant:
+  id: va
+  microphone: microphone_id
+  speaker: speaker_id
+  # Использование Home Assistant для распознавания (STT/TTS/Wake Word)
+  # Необходима конфигурация в Home Assistant (Assist)
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 1.5
+
+# Опционально: кнопка для активации (Push-to-talk)
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: {{ action_button | default("GPIO9") }} # Кнопка BOOT на SuperMini (иногда требует внешнюю подтяжку)
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Кнопка активации"
+    on_click:
+      - if:
+          condition:
+            voice_assistant.is_running:
+          then:
+            - voice_assistant.stop:
+          else:
+            - voice_assistant.start:
+
+# Дополнительно: Индикатор состояния (светодиод на плате)
+light:
+  - platform: status_led
+    id: status_led_light
+    name: "Статус LED"
+    pin:
+      number: GPIO8 # Светодиод на C3 SuperMini
+      inverted: true
