@@ -1,6 +1,6 @@
 {% set device_name = serial_number | default("espHome-SmartStation") %}
 {% set friendly_name = ("espHome SmartStation #" ~ serial_number) | default("espHome SmartStation") %}
-{% set firmware_version = "0.1-beta" %}
+{% set firmware_version = "0.1.0-beta" %}
 
 esphome:
   name: "{{ device_name }}"

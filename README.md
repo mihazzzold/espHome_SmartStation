@@ -1,5 +1,7 @@
 # 🎙️ espHome SmartStation (ESP32-C3)
 
+[![Version](https://img.shields.io/badge/version-0.1.0--beta-blue.svg)](../../CHANGELOG.md)
+
 Прошивка для создания умной колонки (Voice Assistant) на базе ESP32-C3 SuperMini, ЦАП PCM5102A и микрофона INMP441. 🏠🤖
 
 ## ✨ Особенности
