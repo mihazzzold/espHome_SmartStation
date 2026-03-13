@@ -9,6 +9,11 @@ esphome:
     name: "mihazzz123.espHome-SmartStation"
     version: "${firmware_version}"
 
+# dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
+# dashboard_import:
+#   package_import_url: "https://raw.githubusercontent.com/{{ github_user | default('mihazzz123') }}/{{ github_repo | default('esphomeFlasher') }}/main/firmwares/espHome_SmartStation/espHome_SmartStation.yaml.j2"
+#   import_full_config: false
+
 esp32:
   board: {{ board | default("esp32-c3-devkitm-1") }}
   variant: esp32c3
@@ -61,23 +66,31 @@ microphone:
     pdm: false
     # INMP441 работает в обычном режиме I2S, используя общие шины BCK/LRCK с ЦАП
 
-# Голосовой ассистент
+# Голосовой ассистент 🎙️
 voice_assistant:
   id: va
   microphone: microphone_id
   speaker: speaker_id
-  # Использование Home Assistant для распознавания (STT/TTS/Wake Word)
-  # Необходима конфигурация в Home Assistant (Assist)
+  # Использование Home Assistant для распознавания (STT/TTS/Wake Word) 🤖
+  # Необходима конфигурация в Home Assistant (Assist) 🏠
   noise_suppression_level: 2
   auto_gain: 31dBFS
   volume_multiplier: 1.5
 
-# Настройка HTTP клиента для обновлений
+  # Настройка HTTP клиента для обновлений
 http_request:
   id: http_client
   timeout: 10s
   useragent: "ESPHome/{{ firmware_version }}"
   verify_ssl: false
+
+# Нативная сущность обновления в Home Assistant (доступно с ESPHome 2023.9.0+)
+update:
+  - platform: http_request
+    id: ha_update_entity
+    name: "Firmware Update"
+    entity_category: diagnostic
+    source: "https://raw.githubusercontent.com/{{ github_user | default('mihazzz123') }}/{{ github_repo | default('esphomeFlasher') }}/main/firmwares/ota-server/mihazzz123.espHome-SmartStation/latest.json"
 
 globals:
   - id: available_version
@@ -141,6 +154,9 @@ text_sensor:
     name: "Firmware Changelog"
     entity_category: diagnostic
 
+# Настройка прокси для прошивки (помогает при прямом скачивании в HA)
+# Включается только если ESPHome собран с поддержкой ota: platform: http_request
+
 script:
   - id: check_firmware_update
     then:
@@ -177,6 +193,8 @@ script:
           then:
             - lambda: |-
                 ESP_LOGI("ota", "Запуск обновления из URL: %s", id(update_url).c_str());
+            - ota.http_request.set_url: !lambda 'return id(update_url);'
+            - ota.http_request.flash:
           else:
             - logger.log: "URL обновления не найден. Сначала проверьте наличие обновлений."
 
@@ -188,21 +206,21 @@ interval:
 button:
   - platform: template
     id: check_update_button
-    name: "Check for updates"
+    name: "Check for updates" 🔍
     icon: "mdi:update"
     on_press:
       - script.execute: check_firmware_update
 
   - platform: template
     id: install_update_button
-    name: "Install update"
+    name: "Install update" ⚡
     icon: "mdi:download"
     entity_category: config
     on_press:
       - script.execute: install_firmware_update
 
   - platform: template
-    name: "Speaker Test (Beep)"
+    name: "Speaker Test (Beep)" 🔊
     id: speaker_test_button
     icon: "mdi:volume-high"
     on_press:
@@ -212,7 +230,7 @@ button:
       - logger.log: "Запущен тест динамика через Voice Assistant (краткое пробуждение)"
 
   - platform: template
-    name: "Mic Test (Log)"
+    name: "Mic Test (Log)" 🎤
     id: mic_test_button
     icon: "mdi:microphone-settings"
     on_press:
