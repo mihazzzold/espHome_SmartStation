@@ -1,6 +1,6 @@
 {% set device_name = serial_number | default("espHome-SmartStation") %}
 {% set friendly_name = ("espHome SmartStation #" ~ serial_number) | default("espHome SmartStation") %}
-{% set firmware_version = "0.1.0-beta" %}
+{% set firmware_version = "0.1.1-beta" %}
 
 esphome:
   name: "{{ device_name }}"
@@ -75,7 +75,21 @@ voice_assistant:
   # Необходима конфигурация в Home Assistant (Assist) 🏠
   noise_suppression_level: 2
   auto_gain: 31dBFS
-  volume_multiplier: 1.5
+  volume_multiplier: 2.0
+  on_error:
+    - logger.log:
+        format: "Voice Assistant Error!"
+        level: ERROR
+  on_client_connected:
+    - logger.log: "Voice Assistant client connected to Home Assistant"
+  on_client_disconnected:
+    - logger.log: "Voice Assistant client disconnected"
+  on_tts_start:
+    - logger.log: "Voice Assistant: Speaking..."
+  on_stt_end:
+    - logger.log:
+        format: "Voice Assistant: Recognition finished: %s"
+        args: [ "text" ]
 
   # Настройка HTTP клиента для обновлений
 http_request:
@@ -215,15 +229,16 @@ button:
     id: speaker_test_button
     icon: "mdi:volume-high"
     on_press:
-      - voice_assistant.start_continuous:
-      - delay: 100ms
-      - voice_assistant.stop:
-      - logger.log: "Запущен тест динамика через Voice Assistant (краткое пробуждение)"
+      - speaker.play:
+          data: [ 100, 100, 100, 100, 0, 0, 0, 0 ] # Простой звук
+      - logger.log: "Запущен прямой тест динамика (Beep)"
 
   - platform: template
     name: "Mic Test (Log) 🎤"
     id: mic_test_button
     icon: "mdi:microphone-settings"
     on_press:
-      - logger.log: "Тестирование микрофона: проверьте уровень сигнала в логах ESPHome (DEBUG)"
+      - logger.log: "Тестирование микрофона (5 сек): проверьте уровень сигнала в логах ESPHome (DEBUG)"
       - voice_assistant.start:
+      - delay: 5s
+      - voice_assistant.stop:
