@@ -98,11 +98,6 @@ http_request:
   useragent: "ESPHome/{{ firmware_version }}"
   verify_ssl: true
 
-# Глобальный заголовок для всех HTTP-запросов (GitHub авторизация)
-# Работает только в ESPHome 2024.12.0+
-# headers:
-#   Authorization: !lambda 'return "token " + std::string(SECRET_GITHUB_TOKEN);'
-
 # Нативная сущность обновления в Home Assistant (доступно с ESPHome 2023.9.0+)
 update:
   - platform: http_request
@@ -183,6 +178,14 @@ script:
       - http_request.get:
           # GitHub Raw поддерживает заголовок Authorization: token <token>
           url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
+          request_headers:
+            Authorization: !lambda |-
+              #ifdef SECRET_GITHUB_TOKEN
+                if (std::string(SECRET_GITHUB_TOKEN).length() > 0) {
+                  return "token " + std::string(SECRET_GITHUB_TOKEN);
+                }
+              #endif
+              return "";
           on_response:
             - lambda: |-
                 if (status == 200) {
