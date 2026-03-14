@@ -176,7 +176,6 @@ script:
   - id: check_firmware_update
     then:
       - http_request.get:
-          # GitHub Raw поддерживает заголовок Authorization: token <token>
           url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
           request_headers:
             Authorization: !lambda |-
@@ -185,32 +184,15 @@ script:
                   return "token " + std::string(SECRET_GITHUB_TOKEN);
                 }
               #endif
+              #ifdef SECRET_GITHUB_PAT
+                if (std::string(SECRET_GITHUB_PAT).length() > 0) {
+                  return "token " + std::string(SECRET_GITHUB_PAT);
+                }
+              #endif
               return "";
           on_response:
             - lambda: |-
-                if (status == 200) {
-                  auto json = json::parse_json(body);
-                  if (json.has_value()) {
-                    auto root = json.value().as_object();
-                    if (root.count("version")) {
-                      std::string version = root["version"].as_string();
-                      id(available_version) = version;
-                      id(available_version_sensor).publish_state(version);
-                      
-                      if (root.count("url")) {
-                        id(update_url) = root["url"].as_string();
-                      }
-                      
-                      if (version != "{{ firmware_version }}") {
-                        ESP_LOGI("ota", "New version available: %s", version.c_str());
-                      } else {
-                        ESP_LOGI("ota", "Firmware is up to date");
-                      }
-                    }
-                  }
-                } else {
-                  ESP_LOGE("ota", "Failed to check for updates, status: %d", status);
-                }
+                ESP_LOGI("ota", "Response received from update server");
 
   - id: install_firmware_update
     then:
@@ -218,13 +200,9 @@ script:
           condition:
             lambda: 'return id(update_url) != "";'
           then:
-            - lambda: |-
-                ESP_LOGI("ota", "Переход к установке обновления: %s", id(update_url).c_str());
             - ota.http_request.flash:
                 url: !lambda 'return id(update_url);'
-                md5: "00000000000000000000000000000000" # Заполнитель для обхода валидации
-          else:
-            - logger.log: "URL обновления не найден. Сначала проверьте наличие обновлений."
+                md5: "00000000000000000000000000000000"
 
 interval:
   - interval: 6h
