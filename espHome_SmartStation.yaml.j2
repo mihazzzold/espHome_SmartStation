@@ -6,12 +6,12 @@ esphome:
   name: "{{ device_name }}"
   friendly_name: "{{ friendly_name }}"
   project:
-    name: "mihazzz123.espHome-SmartStation"
+    name: "mihazzzold.espHome-SmartStation"
     version: "${firmware_version}"
 
 # dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
 # dashboard_import:
-#   package_import_url: "https://raw.githubusercontent.com/{{ github_user | default('mihazzz123') }}/{{ github_repo | default('esphomeFlasher') }}/main/firmwares/espHome_SmartStation/espHome_SmartStation.yaml.j2"
+#   package_import_url: "https://raw.githubusercontent.com/{{ github_user | default('mihazzzold') }}/{{ github_repo | default('esphomeFlasher') }}/main/firmwares/espHome_SmartStation/espHome_SmartStation.yaml.j2"
 #   import_full_config: false
 
 esp32:
@@ -110,7 +110,7 @@ update:
     name: "Firmware Update"
     entity_category: diagnostic
     # Для приватного репозитория используем raw URL
-    source: "https://raw.githubusercontent.com/mihazzz123/espHome_SmartStation/main/latest.json"
+    source: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
 
 globals:
   - id: available_version
@@ -182,7 +182,7 @@ script:
     then:
       - http_request.get:
           # GitHub Raw поддерживает заголовок Authorization: token <token>
-          url: "https://raw.githubusercontent.com/mihazzz123/espHome_SmartStation/main/latest.json"
+          url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
           on_response:
             - lambda: |-
                 if (status == 200) {
