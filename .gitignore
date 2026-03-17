@@ -4,3 +4,8 @@
 *.yaml.sh
 *.yaml.bat
 secrets.yaml
+latest.bin
+latest.json
+latest.txt
+ota-espHome_SmartStation.bin
+firmwares/
