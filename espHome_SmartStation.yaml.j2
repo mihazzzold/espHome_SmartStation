@@ -235,14 +235,6 @@ script:
             - ota.http_request.flash:
                 url: !lambda 'return id(update_url);'
                 md5: "00000000000000000000000000000000"
-                headers:
-                  Authorization: !lambda |-
-                    #ifdef SECRET_GITHUB_TOKEN
-                      if (std::string(SECRET_GITHUB_TOKEN).length() > 0) {
-                        return "token " + std::string(SECRET_GITHUB_TOKEN);
-                      }
-                    #endif
-                    return "";
 
 interval:
   - interval: 6h
