@@ -8,6 +8,9 @@ esphome:
   project:
     name: "mihazzzold.espHome-SmartStation"
     version: "${firmware_version}"
+  platformio_options:
+    build_flags:
+      - '-DSECRET_GITHUB_TOKEN="!secret github_token"'
 
 # dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
 # dashboard_import:
@@ -21,10 +24,15 @@ esp32:
     type: esp-idf
 
 wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
   ap:
     ssid: "{{ device_name }}-setup"
     password: !secret ap_password
   reboot_timeout: 0s
+  on_connect:
+    - script.execute: check_firmware_update
 
 captive_portal:
 
@@ -98,14 +106,8 @@ http_request:
   useragent: "ESPHome/{{ firmware_version }}"
   verify_ssl: true
 
-# Нативная сущность обновления в Home Assistant (доступно с ESPHome 2023.9.0+)
-update:
-  - platform: http_request
-    id: ha_update_entity
-    name: "Firmware Update"
-    entity_category: diagnostic
-    # Для приватного репозитория используем raw URL
-    source: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
+# Нативная сущность обновления (отключена, так как не поддерживает приватные репозитории напрямую)
+# Для работы с GitHub PAT используется script: check_firmware_update ниже
 
 globals:
   - id: available_version
@@ -133,6 +135,14 @@ binary_sensor:
             - voice_assistant.stop:
           else:
             - voice_assistant.start:
+
+  - platform: template
+    name: "New Firmware Available"
+    id: update_available_sensor
+    icon: "mdi:update"
+    entity_category: diagnostic
+    lambda: |-
+      return id(available_version) != "{{ firmware_version }}";
 
 # Дополнительно: Индикатор состояния (светодиод на плате)
 light:
@@ -175,24 +185,46 @@ text_sensor:
 script:
   - id: check_firmware_update
     then:
-      - http_request.get:
-          url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
-          request_headers:
-            Authorization: !lambda |-
-              #ifdef SECRET_GITHUB_TOKEN
-                if (std::string(SECRET_GITHUB_TOKEN).length() > 0) {
-                  return "token " + std::string(SECRET_GITHUB_TOKEN);
-                }
-              #endif
-              #ifdef SECRET_GITHUB_PAT
-                if (std::string(SECRET_GITHUB_PAT).length() > 0) {
-                  return "token " + std::string(SECRET_GITHUB_PAT);
-                }
-              #endif
-              return "";
-          on_response:
-            - lambda: |-
-                ESP_LOGI("ota", "Response received from update server");
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - http_request.get:
+                url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
+                request_headers:
+                  Authorization: !lambda |-
+                    #ifdef SECRET_GITHUB_TOKEN
+                      if (std::string(SECRET_GITHUB_TOKEN).length() > 0) {
+                        return "token " + std::string(SECRET_GITHUB_TOKEN);
+                      }
+                    #endif
+                    #ifdef SECRET_GITHUB_PAT
+                      if (std::string(SECRET_GITHUB_PAT).length() > 0) {
+                        return "token " + std::string(SECRET_GITHUB_PAT);
+                      }
+                    #endif
+                    return "";
+                on_response:
+                  - lambda: |-
+                      ESP_LOGI("ota", "Response received from update server");
+                      auto json = json::parse_json(body);
+                      if (json.has_value()) {
+                        auto root = json->as<JsonObject>();
+                        if (root.containsKey("version")) {
+                          std::string version = root["version"].as<std::string>();
+                          id(available_version) = version;
+                          ESP_LOGI("ota", "Available version: %s", version.c_str());
+                          
+                          if (root.containsKey("url")) {
+                            id(update_url) = root["url"].as<std::string>();
+                          }
+                          if (root.containsKey("changelog")) {
+                            id(changelog_sensor).publish_state(root["changelog"].as<std::string>());
+                          }
+                        }
+                      } else {
+                        ESP_LOGE("ota", "Failed to parse update JSON (possibly auth error or invalid format)");
+                      }
 
   - id: install_firmware_update
     then:
@@ -203,11 +235,23 @@ script:
             - ota.http_request.flash:
                 url: !lambda 'return id(update_url);'
                 md5: "00000000000000000000000000000000"
+                headers:
+                  Authorization: !lambda |-
+                    #ifdef SECRET_GITHUB_TOKEN
+                      if (std::string(SECRET_GITHUB_TOKEN).length() > 0) {
+                        return "token " + std::string(SECRET_GITHUB_TOKEN);
+                      }
+                    #endif
+                    return "";
 
 interval:
   - interval: 6h
     then:
-      - script.execute: check_firmware_update
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - script.execute: check_firmware_update
 
 button:
   - platform: template
@@ -224,6 +268,16 @@ button:
     entity_category: config
     on_press:
       - script.execute: install_firmware_update
+
+  - platform: template
+    name: "Speaker Test (Beep) 🔊"
+    id: speaker_test_button
+    icon: "mdi:volume-high"
+    on_press:
+      - voice_assistant.start_continuous:
+      - delay: 100ms
+      - voice_assistant.stop:
+      - logger.log: "Запущен тест динамика через Voice Assistant (краткое пробуждение)"
 
   - platform: template
     name: "Mic Test (Log) 🎤"
