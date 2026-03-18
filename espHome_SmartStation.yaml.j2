@@ -8,9 +8,6 @@ esphome:
   project:
     name: "mihazzzold.espHome-SmartStation"
     version: "${firmware_version}"
-  platformio_options:
-    build_flags:
-      - '-DSECRET_GITHUB_TOKEN="!secret github_token"'
 
 # dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
 # dashboard_import:
@@ -118,6 +115,10 @@ globals:
     type: std::string
     restore_value: no
     initial_value: '""'
+  - id: github_token_val
+    type: std::string
+    restore_value: no
+    initial_value: '"{{ github_token | default("!secret github_token") }}"'
 
 # Опционально: кнопка для активации (Push-to-talk)
 binary_sensor:
@@ -193,33 +194,36 @@ script:
                 url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
                 request_headers:
                   Authorization: !lambda |-
-                    #ifdef SECRET_GITHUB_TOKEN
-                      if (std::string(SECRET_GITHUB_TOKEN).length() > 0) {
-                        return "token " + std::string(SECRET_GITHUB_TOKEN);
-                      }
-                    #endif
-                    #ifdef SECRET_GITHUB_PAT
-                      if (std::string(SECRET_GITHUB_PAT).length() > 0) {
-                        return "token " + std::string(SECRET_GITHUB_PAT);
-                      }
-                    #endif
-                    return "";
+                    static std::string token = "token " + github_token_val->value();
+                    return token.c_str();
                 on_response:
                   - lambda: |-
-                      ESP_LOGI("ota", "Response received from update server");
+                      ESP_LOGI("ota", "Response received from update server. Status: %d", response->status_code);
+                      if (response->status_code != 200) {
+                        ESP_LOGE("ota", "Non-OK status from server: %d", response->status_code);
+                        return;
+                      }
+                      
+                      std::string body;
+                      uint8_t buffer[256];
+                      int len;
+                      while ((len = response->read(buffer, sizeof(buffer))) > 0) {
+                        body.append((char*)buffer, len);
+                      }
+                      
                       auto json = json::parse_json(body);
-                      if (json.has_value()) {
-                        auto root = json->as<JsonObject>();
+                      if (json.as< JsonVariant >().is< JsonObject >()) {
+                        auto root = json.as< JsonObject >();
                         if (root.containsKey("version")) {
-                          std::string version = root["version"].as<std::string>();
-                          id(available_version) = version;
+                          std::string version = root["version"].as< std::string >();
+                          available_version->value() = version;
                           ESP_LOGI("ota", "Available version: %s", version.c_str());
                           
                           if (root.containsKey("url")) {
-                            id(update_url) = root["url"].as<std::string>();
+                            update_url->value() = root["url"].as< std::string >();
                           }
                           if (root.containsKey("changelog")) {
-                            id(changelog_sensor).publish_state(root["changelog"].as<std::string>());
+                            changelog_sensor->publish_state(root["changelog"].as< std::string >());
                           }
                         }
                       } else {
