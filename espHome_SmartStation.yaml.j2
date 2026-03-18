@@ -118,7 +118,7 @@ globals:
   - id: github_token_val
     type: std::string
     restore_value: no
-    initial_value: '"{{ github_token | default("!secret github_token") }}"'
+    initial_value: {{ github_token | default("!secret github_token") }}
 
 # Опционально: кнопка для активации (Push-to-talk)
 binary_sensor:
