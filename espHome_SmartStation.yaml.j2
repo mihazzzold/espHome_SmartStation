@@ -278,16 +278,16 @@ button:
     icon: "mdi:volume-high"
     on_press:
       - voice_assistant.start_continuous:
-      - delay: 100ms
+      - delay: 4s
       - voice_assistant.stop:
-      - logger.log: "Запущен тест динамика через Voice Assistant (краткое пробуждение)"
+      - logger.log: "Запущен тест динамика: активация VA на 4 секунды. Если звука нет, проверьте пины I2S и питание ЦАП."
 
   - platform: template
     name: "Mic Test (Log) 🎤"
     id: mic_test_button
     icon: "mdi:microphone-settings"
     on_press:
-      - logger.log: "Тестирование микрофона (5 сек): проверьте уровень сигнала в логах ESPHome (DEBUG)"
+      - logger.log: "Тестирование микрофона (10 сек): громко говорите в микрофон и следите за логами 'Audio level'"
       - voice_assistant.start:
-      - delay: 5s
+      - delay: 10s
       - voice_assistant.stop:
