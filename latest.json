@@ -1,6 +1,6 @@
-{
+﻿{
   "version": "0.1.2-beta",
-  "url": "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/espHome_SmartStation/latest.bin",
+  "url": "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.bin",
   "changelog": "\\n📦 [0.1.2-beta] - 2026-03-19\\n\\n📦# 🎉 Обновление для Home Assistant (Новая версия)\\n\\n📦# ✨ Новые возможности\\n  • **Internal Temperature Sensor**: Добавлена поддержка датчика внутренней температуры ESP32-C3.\\n  • **WiFi Signal Strength**: Новая сущность для мониторинга качества сигнала WiFi.\\n\\n📦# 🛠️ Исправления\\n  • Улучшена стабильность подключения к голосовому ассистенту.\\n  • Оптимизировано энергопотребление в режиме ожидания.\\n\\n📦 [0.1.1-beta] - 2026-03-15\\n\\n📦# 🎉 Обновление для Home Assistant\\n\\n📦# ✨ Новые возможности\\n  • **Native Update Entity**: В Home Assistant теперь виден статус обновления (Доступна новая версия).\\n  • **OTA Link**: Прямая ссылка на манифест обновления для автоматического обнаружения.\\n\\n📦# 🛠️ Исправления\\n  • Улучшена обработка ошибок при проверке обновлений.\\n  • Оптимизирована структура метаданных для совместимости с ESPHome 2023.9+.\\n\\n📦 [0.1.0-beta] - 2026-03-13\\n\\n📦# 🎉 Первый релиз (Бета 0.1)\\n\\n📦# ✨ Новые возможности\\n  • **espHome SmartStation**: Поддержка голосового ассистента, Hi-Fi звука (PCM5102A) и MEMS микрофона (INMP441).",
   "release_date": "2026-03-19",
   "min_version": "1.0.0",
