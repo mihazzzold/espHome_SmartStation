@@ -34,7 +34,7 @@ wifi:
 captive_portal:
 
 logger:
-  level: WARN
+  level: DEBUG
   hardware_uart: USB_SERIAL_JTAG
 
 api:
@@ -94,7 +94,7 @@ voice_assistant:
   on_stt_end:
     - logger.log:
         format: "Voice Assistant: Recognition finished: %s"
-        args: [ "text" ]
+        args: [ "x.c_str()" ]
 
   # Настройка HTTP клиента для обновлений
 http_request:
@@ -118,7 +118,7 @@ globals:
   - id: github_token_val
     type: std::string
     restore_value: no
-    initial_value: {{ github_token | default("!secret github_token") }}
+    initial_value: !secret github_token
 
 # Опционально: кнопка для активации (Push-to-talk)
 binary_sensor:
@@ -179,6 +179,13 @@ text_sensor:
     id: changelog_sensor
     name: "Firmware Changelog"
     entity_category: diagnostic
+
+sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
 
 # Настройка прокси для прошивки (помогает при прямом скачивании в HA)
 # Включается только если ESPHome собран с поддержкой ota: platform: http_request
