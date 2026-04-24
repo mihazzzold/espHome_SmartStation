@@ -1,17 +1,21 @@
 {% set device_name = serial_number | default("espHome-SmartStation") %}
 {% set friendly_name = ("espHome SmartStation #" ~ serial_number) | default("espHome SmartStation") %}
-{% set firmware_version = "0.1.2-beta" %}
+{% set firmware_version = build_version | default("0.1.2-beta") %}
+{% set github_owner = github_owner | default("mihazzzold") %}
+{% set ota_repo = ota_repo | default("espHome_SmartStation") %}
+{% set ota_base_url = ota_base_url | default("https://ota.m3zold-lab.tech/firmware") %}
+{% set ota_project = ota_project | default(github_owner ~ ".espHome-SmartStation") %}
 
 esphome:
   name: "{{ device_name }}"
   friendly_name: "{{ friendly_name }}"
   project:
-    name: "mihazzzold.espHome-SmartStation"
+    name: "{{ github_owner }}.espHome-SmartStation"
     version: "${firmware_version}"
 
 # dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
 # dashboard_import:
-#   package_import_url: "https://raw.githubusercontent.com/{{ github_user | default('mihazzzold') }}/{{ github_repo | default('esphomeFlasher') }}/main/firmwares/espHome_SmartStation/espHome_SmartStation.yaml.j2"
+#   package_import_url: "<set your config URL here if dashboard import is needed>"
 #   import_full_config: false
 
 esp32:
@@ -198,11 +202,13 @@ script:
             wifi.connected:
           then:
             - http_request.get:
-                url: "https://raw.githubusercontent.com/mihazzzold/espHome_SmartStation/main/latest.json"
+                url: "{{ ota_base_url }}/{{ ota_project }}/latest.json"
                 request_headers:
                   Authorization: !lambda |-
-                    static std::string token = "token " + github_token_val->value();
-                    return token.c_str();
+                    if (id(github_token_val).empty()) {
+                      return "";
+                    }
+                    return "token " + id(github_token_val);
                 on_response:
                   - lambda: |-
                       ESP_LOGI("ota", "Response received from update server. Status: %d", response->status_code);
@@ -223,14 +229,14 @@ script:
                         auto root = json.as< JsonObject >();
                         if (root.containsKey("version")) {
                           std::string version = root["version"].as< std::string >();
-                          available_version->value() = version;
+                          id(available_version) = version;
                           ESP_LOGI("ota", "Available version: %s", version.c_str());
                           
                           if (root.containsKey("url")) {
-                            update_url->value() = root["url"].as< std::string >();
+                            id(update_url) = root["url"].as< std::string >();
                           }
                           if (root.containsKey("changelog")) {
-                            changelog_sensor->publish_state(root["changelog"].as< std::string >());
+                            id(changelog_sensor).publish_state(root["changelog"].as< std::string >());
                           }
                         }
                       } else {
@@ -245,7 +251,6 @@ script:
           then:
             - ota.http_request.flash:
                 url: !lambda 'return id(update_url);'
-                md5: "00000000000000000000000000000000"
 
 interval:
   - interval: 6h
