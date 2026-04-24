@@ -1,6 +1,6 @@
 {% set device_name = serial_number | default("espHome-SmartStation") %}
 {% set friendly_name = ("espHome SmartStation #" ~ serial_number) | default("espHome SmartStation") %}
-{% set firmware_version = build_version | default("0.1.2-beta") %}
+{% set firmware_version = build_version | default("0.2.0-alpha.1") %}
 {% set github_owner = github_owner | default("mihazzzold") %}
 {% set ota_repo = ota_repo | default("espHome_SmartStation") %}
 {% set ota_base_url = ota_base_url | default("https://ota.m3zold-lab.tech/firmware") %}
@@ -253,7 +253,8 @@ script:
                 url: !lambda 'return id(update_url);'
 
 interval:
-  - interval: 6h
+  # В тестовых релизах проверяем обновления чаще.
+  - interval: 1h
     then:
       - if:
           condition:
