@@ -6,12 +6,15 @@
 {% set ota_base_url = ota_base_url | default("https://ota.m3zold-lab.tech/firmware") %}
 {% set ota_project = ota_project | default(github_owner ~ ".espHome-SmartStation") %}
 
+substitutions:
+  github_token_sub: !secret github_token
+
 esphome:
   name: "{{ device_name }}"
   friendly_name: "{{ friendly_name }}"
   project:
     name: "{{ github_owner }}.espHome-SmartStation"
-    version: "${firmware_version}"
+    version: "{{ firmware_version }}"
 
 # dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
 # dashboard_import:
@@ -122,7 +125,7 @@ globals:
   - id: github_token_val
     type: std::string
     restore_value: no
-    initial_value: !secret github_token
+    initial_value: '"${github_token_sub}"'
 
 # Опционально: кнопка для активации (Push-to-talk)
 binary_sensor:
@@ -205,10 +208,12 @@ script:
                 url: "{{ ota_base_url }}/{{ ota_project }}/latest.json"
                 request_headers:
                   Authorization: !lambda |-
+                    static std::string auth_header;
                     if (id(github_token_val).empty()) {
                       return "";
                     }
-                    return "token " + id(github_token_val);
+                    auth_header = "token " + id(github_token_val);
+                    return auth_header.c_str();
                 on_response:
                   - lambda: |-
                       ESP_LOGI("ota", "Response received from update server. Status: %d", response->status_code);
@@ -251,6 +256,7 @@ script:
           then:
             - ota.http_request.flash:
                 url: !lambda 'return id(update_url);'
+                md5_url: !lambda 'return id(update_url) + ".md5";'
 
 interval:
   # В тестовых релизах проверяем обновления чаще.
