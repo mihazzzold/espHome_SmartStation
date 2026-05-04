@@ -1,13 +1,13 @@
 {% set device_name = serial_number | default("espHome-SmartStation") %}
 {% set friendly_name = ("espHome SmartStation #" ~ serial_number) | default("espHome SmartStation") %}
-{% set firmware_version = build_version | default("0.2.0-alpha.1") %}
+{% set firmware_version = build_version | default("0.2.0-alpha.4") %}
 {% set github_owner = github_owner | default("mihazzzold") %}
 {% set ota_repo = ota_repo | default("espHome_SmartStation") %}
 {% set ota_base_url = ota_base_url | default("https://ota.m3zold-lab.tech/firmware") %}
 {% set ota_project = ota_project | default(github_owner ~ ".espHome-SmartStation") %}
 
-substitutions:
-  github_token_sub: !secret github_token
+# Манифест OTA на ota.m3zold-lab.tech публичный — GitHub PAT в заголовках не используем
+# (substitutions + ${...} в globals давали сырой ghp_... в C++ и ошибку компиляции).
 
 esphome:
   name: "{{ device_name }}"
@@ -110,8 +110,7 @@ http_request:
   useragent: "ESPHome/{{ firmware_version }}"
   verify_ssl: true
 
-# Нативная сущность обновления (отключена, так как не поддерживает приватные репозитории напрямую)
-# Для работы с GitHub PAT используется script: check_firmware_update ниже
+# Проверка OTA: HTTP GET публичного latest.json + script install_firmware_update (http_request flash).
 
 globals:
   - id: available_version
@@ -122,10 +121,6 @@ globals:
     type: std::string
     restore_value: no
     initial_value: '""'
-  - id: github_token_val
-    type: std::string
-    restore_value: no
-    initial_value: '"${github_token_sub}"'
 
 # Опционально: кнопка для активации (Push-to-talk)
 binary_sensor:
@@ -206,14 +201,6 @@ script:
           then:
             - http_request.get:
                 url: "{{ ota_base_url }}/{{ ota_project }}/latest.json"
-                request_headers:
-                  Authorization: !lambda |-
-                    static std::string auth_header;
-                    if (id(github_token_val).empty()) {
-                      return "";
-                    }
-                    auth_header = "token " + id(github_token_val);
-                    return auth_header.c_str();
                 on_response:
                   - lambda: |-
                       ESP_LOGI("ota", "Response received from update server. Status: %d", response->status_code);
