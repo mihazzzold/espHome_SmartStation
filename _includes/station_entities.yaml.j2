@@ -1,0 +1,30 @@
+globals:
+{% include "ota_globals_entries.yaml.j2" %}
+
+select:
+{% include "onboarding_select_entry.yaml.j2" %}
+
+text_sensor:
+{% include "ota_text_sensor_entries.yaml.j2" %}
+
+button:
+  - platform: template
+    name: "Speaker Test (Beep) 🔊"
+    id: speaker_test_button
+    icon: "mdi:volume-high"
+    on_press:
+      - voice_assistant.start_continuous:
+      - delay: 4s
+      - voice_assistant.stop:
+      - logger.log: "Запущен тест динамика: активация VA на 4 секунды."
+
+  - platform: template
+    name: "Mic Test (Log) 🎤"
+    id: mic_test_button
+    icon: "mdi:microphone-settings"
+    on_press:
+      - logger.log: "Тестирование микрофона (10 сек): говорите в микрофон."
+      - voice_assistant.start:
+      - delay: 10s
+      - voice_assistant.stop:
+{% include "ota_button_entries.yaml.j2" %}

@@ -1,0 +1,65 @@
+# --- Бизнес-логика SmartStation: I2S, Assist, кнопки теста ---
+
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: {{ speaker_lrclk | default("GPIO3") }}
+    i2s_bclk_pin: {{ speaker_bclk | default("GPIO2") }}
+
+speaker:
+  - platform: i2s_audio
+    id: speaker_id
+    i2s_audio_id: i2s_bus
+    i2s_dout_pin: {{ speaker_dout | default("GPIO1") }}
+    dac_type: external
+
+microphone:
+  - platform: i2s_audio
+    id: microphone_id
+    i2s_audio_id: i2s_bus
+    i2s_din_pin: {{ mic_din | default("GPIO6") }}
+    adc_type: external
+    pdm: false
+
+voice_assistant:
+  id: va
+  microphone: microphone_id
+  speaker: speaker_id
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_error:
+    - logger.log:
+        format: "Voice Assistant Error!"
+        level: ERROR
+  on_client_connected:
+    - logger.log: "Voice Assistant client connected to Home Assistant"
+  on_client_disconnected:
+    - logger.log: "Voice Assistant client disconnected"
+  on_tts_start:
+    - logger.log: "Voice Assistant: Speaking..."
+  on_stt_end:
+    - logger.log:
+        format: "Voice Assistant: Recognition finished: %s"
+        args: [ "x.c_str()" ]
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: {{ action_button | default("GPIO9") }}
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Кнопка активации"
+    on_click:
+      - if:
+          condition:
+            voice_assistant.is_running:
+          then:
+            - voice_assistant.stop:
+          else:
+            - voice_assistant.start:
+
+script:
+{% include "logic_ota_platform.yaml.j2" %}
+
+interval:
+{% include "interval_ota_sync.yaml.j2" %}
