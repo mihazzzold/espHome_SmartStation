@@ -1,9 +1,4 @@
-# Служебные sensor:/debug: (на ESP8266 отдельный debug: с loop_time)
-{% if chip_family == "esp8266" %}
-debug:
-  update_interval: 30s
-{% endif %}
-
+# Служебные sensor: (компонент debug: — в runtime_network_ota для ESP8266)
 sensor:
 {% include "diagnostics_sensor_entries.yaml.j2" %}
 

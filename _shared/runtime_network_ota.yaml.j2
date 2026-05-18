@@ -37,10 +37,12 @@ logger:
   hardware_uart: {{ logger_hardware_uart }}
 {% endif %}
 
-{% if chip_family != "esp8266" and not (zigbee_enabled | default(false)) %}
+{% if chip_family == "esp8266" %}
+debug:
+  update_interval: 30s
+{% elif not (zigbee_enabled | default(false)) %}
 debug:
   update_interval: 10s
-
 {% endif %}
 improv_serial:
 
