@@ -1,0 +1,13 @@
+# =============================================================================
+# Готовый блок для устройств БЕЗ своего maintenance.yaml.j2 (example и т.п.)
+# Увлажнитель использует свой _includes/maintenance.yaml.j2 с тем же смыслом.
+# =============================================================================
+globals:
+{% include "ota_globals_entries.yaml.j2" %}
+
+text_sensor:
+{% include "ota_text_sensor_entries.yaml.j2" %}
+
+button:
+{% include "ota_button_entries.yaml.j2" %}
+
