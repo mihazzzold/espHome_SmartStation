@@ -59,7 +59,11 @@ binary_sensor:
             - voice_assistant.start:
 
 script:
+{% if chip_family != "esp8266" %}
 {% include "logic_ota_platform.yaml.j2" %}
+{% endif %}
 
 interval:
+{% if chip_family != "esp8266" %}
 {% include "interval_ota_sync.yaml.j2" %}
+{% endif %}

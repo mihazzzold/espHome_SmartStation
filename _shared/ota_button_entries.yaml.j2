@@ -1,4 +1,5 @@
 {% include "onboarding_button_finish_entry.yaml.j2" %}
+{% if chip_family != "esp8266" %}
   - platform: template
     id: check_update_button
     name: "{{ name_btn_check_upd }}"
@@ -15,6 +16,7 @@
     on_press:
       - update.perform:
           id: firmware_update
+{% endif %}
 
   - platform: factory_reset
     id: factory_reset_button
