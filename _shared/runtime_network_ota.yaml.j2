@@ -26,7 +26,7 @@ wifi:
 
 captive_portal:
 
-{% if status_led_pin is defined %}
+{% if status_led_pin is defined and (use_status_led | default(true)) %}
 status_led:
   pin: {{ status_led_pin }}
 {% endif %}

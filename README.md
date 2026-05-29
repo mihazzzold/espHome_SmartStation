@@ -1,112 +1,64 @@
-# 🎙️ espHome SmartStation (ESP32-C3)
+# 🎙️ espHome SmartStation (ESP32-C3 / ESP32-C6)
 
-[![Version](https://img.shields.io/badge/version-0.1.1--beta-blue.svg)](../../CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0.2-blue.svg)](../../../CHANGELOG.md)
 
-Прошивка для создания умной колонки (Voice Assistant) на базе ESP32-C3 SuperMini, ЦАП PCM5102A и микрофона INMP441. 🏠🤖
+Голосовой сателлит Home Assistant **Assist**: **INMP441** + **MAX98357A** на **ESP32-C3** или **ESP32-C6** SuperMini.
+
+| Плата | Профиль `flasher` | OTA на сервере |
+|-------|-------------------|----------------|
+| ESP32-C3 SuperMini | `esp32c3-supermini` | `mihazzzold.espHome-SmartStation.esp32c3` |
+| ESP32-C6 SuperMini | `esp32c6-supermini` | `mihazzzold.espHome-SmartStation.esp32c6` |
+
+Пины I2S и кнопки **одинаковые** на C3 и C6 (см. `firmwares/boards/*-supermini.yaml`, секция SmartStation).
 
 ## ✨ Особенности
-- 🤖 **Voice Assistant**: Полная интеграция с Home Assistant Assist.
-- 🔈 **Hi-Fi звук**: Использование внешнего I2S ЦАП PCM5102A.
-- 🎤 **MEMS микрофон**: Высокочувствительный I2S микрофон INMP441.
-- 🔘 **Push-to-talk**: Активация голоса через встроенную кнопку BOOT.
-- 💡 **LED статус**: Индикация состояний (слушает, думает, говорит).
-- 🔄 **OTA Updates**: Автоматическое обновление прошивки через GitHub (включая приватные репозитории).
-- 🧪 **Диагностика**: Встроенные тесты оборудования прямо в Home Assistant.
 
-## 🔌 Схема подключения
+- 🤖 **Voice Assistant** + **micro_wake_word** (okay nabu, hey jarvis) или wake-word в HA (openWakeWord)
+- 🔈 **I2S выход**: MAX98357A → динамик 4–8 Ω
+- 🎤 **I2S вход**: INMP441
+- 🔘 **Push-to-talk**: GPIO9 (BOOT)
+- 💡 **LED фаз**: GPIO8 (PWM)
+- 🔄 **OTA**: `update.http_request` + manifest на ota-s3 (отдельный bin для C3 и C6)
+- 🏭 **Заводской режим**: `--factory-build` — `esphome-smartstation` + MAC, без STA Wi‑Fi из secrets
 
-### 🔈 PCM5102A (I2S Output)
-- **VIN** -> 5V (Рекомендуется для лучшего качества звука)
-- **GND** -> GND
-- **BCK** (BCLK) -> **GPIO2**
-- **DIN** (DOUT) -> **GPIO1**
-- **LCK** (LRCK/WS) -> **GPIO3**
-- **XSMT** -> Соединить с **VIN** (без этого будет Mute!)
+## 📦 Прошивка
 
-### 🎤 INMP441 (I2S Input)
-- **VDD** -> 3.3V
-- **GND** -> GND
-- **L/R** -> **GND** (Выбор левого канала)
-- **SD** (SDOUT) -> **GPIO6**
-- **WS** (LRCK) -> **GPIO3** (Общий с ЦАП)
-- **SCK** (BCLK) -> **GPIO2** (Общий с ЦАП)
+Из корня **esphomeFlasher**:
 
-### 🛠️ Подготовка платы ЦАП (Пайка)
-На фиолетовой плате PCM5102A необходимо настроить перемычки на обратной стороне:
-- **H1L, H2L, H3L, H4L**: Все 4 перемычки должны быть запаяны в положение **L**.
-  - Это настраивает формат I2S, отключает De-emphasis и включает внутренний клок (Internal SCK).
-- **Пин SCK** на основной гребенке после этого подключать **не нужно**.
+```powershell
+python scripts/apply_ci_overrides.py
+```
 
-### 🛠️ Дополнительно
-- **Кнопка (Активация)** -> GPIO9 (Встроенная кнопка Boot)
-- **LED (Статус)** -> GPIO8 (Встроенный LED)
+| Режим | Команда |
+|-------|---------|
+| **Завод / OTA для покупателей** | `--factory-build` (или `FLASHER_FACTORY_BUILD=1`) |
+| **Своя станция** | `$env:FLASHER_SERIAL_NUMBER="esp-…"` + обычный `run` |
 
-## 🧪 Тестирование оборудования
-В Home Assistant доступны сервисные кнопки для проверки:
-- **Тест динамика (Beep)**: Кратковременно активирует аудио-выход для проверки ЦАП (PCM5102A).
-- **Тест микрофона (Лог)**: Активирует Voice Assistant и выводит информацию об уровне входного сигнала в логи (DEBUG уровень).
+```powershell
+# ESP32-C6, завод:
+py -3.13 scripts/flasher.py --local `
+  -f firmwares-external/mihazzzold.espHome-SmartStation/espHome_SmartStation.yaml.j2 `
+  --board-profile esp32c6-supermini --factory-build -a run --port COM5 -y
+```
 
-## ⚙️ Настройка в Home Assistant
+Подробнее: [`SETUP.md`](SETUP.md).
 
-Для полноценной работы голосового ассистента в Home Assistant должны быть установлены и настроены следующие компоненты:
+## 🏠 Home Assistant
 
-### 1. 🧱 Подготовка Home Assistant
-Убедитесь, что у вас установлены официальные аддоны (или их аналоги в Docker):
-- **Whisper** (Faster-Whisper) — для распознавания речи (STT).
-- **Piper** — для синтеза речи (TTS).
-- **openWakeWord** — для обнаружения фразы активации (Wake Word), если планируется работа без нажатия кнопки.
+| Документ | Содержание |
+|----------|------------|
+| **[`HOME_ASSISTANT.md`](HOME_ASSISTANT.md)** | Wyoming, Assist, сателлит, wake-word, OTA, troubleshooting |
+| [`SETUP.md`](SETUP.md) | Пайка, питание, прошивка |
 
-### 2. 🛣️ Настройка голосового помощника (Assist)
-1. Перейдите в **Настройки** -> **Голосовые помощники** (Voice Assistants) -> вкладка **Assist**.
-2. Нажмите **Добавить помощника** или настройте существующий.
-3. Выберите язык (например, Русский).
-4. Укажите установленные Whisper (STT) и Piper (TTS).
-5. (Опционально) Выберите модель для Wake Word (например, "ok nabu").
+Краткий порядок: **Whisper + Piper** (дополнения) → Wyoming → ассистент **main** → ESPHome → SETUP на устройстве → сателлит → тесты динамика/микрофона.
 
-### 3. 🔗 Подключение устройства
-1. Прошейте ESP32-C3 через ESPHome Flasher или `esphome run`.
-2. После подключения к Wi-Fi устройство появится в Home Assistant в разделе **Интеграции** -> **ESPHome**.
-3. Нажмите **Настроить** и введите ключ API, если он был задан.
-4. В настройках самого устройства ESPHome в HA (в разделе "Голос" / "Assist"):
-   - Убедитесь, что сущность `Voice Assistant` включена.
-   - В выпадающем списке выберите созданного ранее помощника (пайплайн).
-   - Теперь управление пайплайном доступно напрямую со страницы устройства без перехода в общие настройки Assist.
+## 🔄 OTA
 
-### 4. 🚀 Использование
-- **Нажатие кнопки (Push-to-Talk)**: Нажмите кнопку BOOT (GPIO9), дождитесь звукового сигнала или световой индикации и произнесите команду.
-- **Голосовая активация**: Если в пайплайне настроен Wake Word, просто произнесите фразу активации.
+- **C3:** `…/mihazzzold.espHome-SmartStation.esp32c3/manifest.json`
+- **C6:** `…/mihazzzold.espHome-SmartStation.esp32c6/manifest.json`
 
-## 🛠️ Устранение неполадок (Если "ничего не работает")
-
-Если устройство подключилось, но не реагирует:
-
-1.  **Проверьте логи ESPHome**: Откройте "Logs" в интеграции ESPHome в HA.
-    - Ищите ошибки `Voice Assistant Error`.
-    - Если видите `Client disconnected`, проверьте настройки API и Pipeline.
-2.  **Используйте тестовые кнопки**:
-    - Нажмите **Speaker Test (Beep)**. Если звука нет — проверьте питание ЦАП и GPIO1, 2, 3.
-    - Нажмите **Mic Test (Log)** и говорите в микрофон. В логах (уровень DEBUG) должны бежать данные об уровне сигнала.
-3.  **Настройка Pipeline**:
-    - Убедитесь, что в HA выбран правильный "Голосовой помощник" (Settings -> Voice Assistants).
-    - Проверьте, что Whisper и Piper запущены и работают.
-4.  **GPIO на ESP32-C3 SuperMini**:
-    - Если кнопка BOOT не работает, попробуйте изменить `action_button` на другой пин в `secrets.yaml` или убедитесь, что пин GPIO9 не притянут к земле постоянно.
-
-## 🔄 Система обновлений (OTA)
-
-Прошивка поддерживает автоматическую проверку обновлений через GitHub (включая приватные репозитории).
-
-### ⚙️ Настройка (для приватного репозитория)
-Если ваш репозиторий приватный, выполните следующие шаги:
-1. **GitHub Token**: Создайте [Personal Access Token (classic)](https://github.com/settings/tokens) с правами `repo` (чтение содержимого).
-2. **secrets.yaml**: Добавьте токен: `github_token: "ghp_ваш_токен_здесь"`.
-3. **Прошивка**: После добавления токена и прошивки устройство сможет авторизоваться на GitHub.
-
-### 📦 Как подготовить обновление
-1. Сгенерируйте свежий YAML и скомпилируйте его (`esphome compile`).
-2. Скопируйте файл `firmware.ota.bin` из папки сборки в корень репозитория как `latest.bin`.
-3. Укажите новую версию в `latest.json` (например, `0.1.2-beta`).
-4. Запушьте `latest.bin` и `latest.json` в ветку `main`.
-5. Устройство увидит обновление и отобразит его в Home Assistant (сенсор `New Firmware Available`).
+CI собирает заводской образ (`FLASHER_FACTORY_BUILD` + `FLASHER_OTA_GENERIC_BUILD`).
 
 ---
+
+📚 Это **канон в git**; копия после `apply_ci_overrides.py` → `firmwares-external/mihazzzold.espHome-SmartStation/`.

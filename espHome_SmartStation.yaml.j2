@@ -1,8 +1,26 @@
 {# =============================================================================
-   SmartStation: runtime (сеть, OTA) + station_logic (I2S, Assist, микрофон)
-   + station_entities (кнопки теста, OTA, SETUP) + diagnostics
+   SmartStation — точка входа (espHome_SmartStation.yaml.j2)
+   Голосовой сателлит: ESP32-C6 + INMP441 + MAX98357A + Home Assistant Assist.
+   =============================================================================
+   1) runtime.yaml.j2       — платформа: Wi‑Fi, API, OTA.
+   2) station_logic.yaml.j2 — БИЗНЕС: 5 фаз Assist (I2S, wake-word, LED, кнопка).
+   3) maintenance.yaml.j2   — OTA, SETUP, тест динамика/мика.
+   4) diagnostics.yaml.j2   — температура чипа, uptime, RSSI, heap.
+   -----------------------------------------------------------------------------
+   Завод / OTA для покупателей (вариант A): FLASHER_FACTORY_BUILD=1 или --factory-build
+   — esphome.name = esphome-smartstation + name_add_mac_suffix (уникальный host по MAC)
+   — без Wi‑Fi STA из secrets (AP + Improv + captive portal)
+   Дев-режим: FLASHER_SERIAL_NUMBER=esp-… (без factory_build) — как раньше.
    ============================================================================= #}
-{% set device_name = serial_number | default("espHome-SmartStation") %}
+{% set factory_build = factory_build | default(false) %}
+{% if factory_build %}
+{% set device_name = "esphome-smartstation" %}
+{% set use_wifi_secrets = false %}
+{% set name_add_mac_suffix = true %}
+{% set friendly_name = (friendly_name_override | default("SmartStation") | trim) or "SmartStation" %}
+{% set ap_ssid_slug = "setup" %}
+{% else %}
+{% set device_name = serial_number | default("esphome-smartstation") %}
 {% set _sn = serial_number | default("") | string %}
 {% set name_suffix = (_sn.split("-")[-1]) if ("-" in _sn) else ((_sn[-4:]) if (_sn | length) >= 4 else _sn) %}
 {% if (friendly_name_override | default("") | trim) %}
@@ -10,8 +28,9 @@
 {% else %}
 {% set friendly_name = ("SmartStation · " ~ name_suffix) if name_suffix else "espHome SmartStation" %}
 {% endif %}
-{% set ap_ssid_suffix = name_suffix if name_suffix else device_name %}
-{% set ap_ssid_slug = (ap_ssid_suffix | string | replace("_", "-"))[:24] %}
+{% set ap_ssid_slug = ((name_suffix if name_suffix else device_name) | string | replace("_", "-"))[:24] %}
+{% set name_add_mac_suffix = false %}
+{% endif %}
 {% set firmware_version = build_version | default("0.2.0-alpha.4") %}
 {% set ui_lang = ui_lang | default("ru") %}
 {% set _ul = (ui_lang | string | lower) %}
@@ -21,19 +40,20 @@
 {% set ota_base_url = ota_base_url | default("https://ota-s3.m3zold-lab.tech/firmware") %}
 {% set chip_family = chip_family | default("esp32") %}
 {% set _bp = board_profile | default({}) %}
-{% set ota_hw = (ota_channel | default(_bp.get("ota_channel") | default("esp32c3"))) | string %}
+{% set ota_hw = (ota_channel | default(_bp.get("ota_channel") | default("esp32c6"))) | string %}
 {% set ota_project = ota_project | default(github_owner ~ ".espHome-SmartStation." ~ ota_hw) %}
 {% set wifi_ap_prefix = "station" %}
 {% set zigbee_enabled = false %}
 {% set logger_level = "DEBUG" %}
 {% set logger_hardware_uart = "USB_SERIAL_JTAG" %}
-{% set status_led_pin = "GPIO8" %}
+{# LED управляется в station_logic (ledc), не через status_led в runtime (flasher всё равно передаёт status_led_pin из профиля) #}
+{% set use_status_led = false %}
+{% set station_led_pin = station_led_pin | default(_bp.get("status_led_pin") | default("GPIO8")) %}
 
-# Сборочный шаблон: runtime, голосовая станция, OTA, диагностика.
 {% include "_includes/runtime.yaml.j2" %}
 
 {% include "_includes/station_logic.yaml.j2" %}
 
-{% include "_includes/station_entities.yaml.j2" %}
+{% include "_includes/maintenance.yaml.j2" %}
 
 {% include "_includes/diagnostics.yaml.j2" %}

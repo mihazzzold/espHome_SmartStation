@@ -1,0 +1,53 @@
+# =============================================================================
+# MAINTENANCE — OTA, SETUP, тест динамика/мика (не основной цикл Assist)
+# =============================================================================
+
+globals:
+{% include "ota_globals_entries.yaml.j2" %}
+
+select:
+  - platform: template
+    name: "Движок wake-word"
+    id: wake_word_engine_location
+    icon: "mdi:account-voice"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - "На устройстве"
+      - "В Home Assistant"
+    initial_option: "На устройстве"
+    on_value:
+      - script.execute: stop_wake_word
+      - delay: 500ms
+      - script.execute: start_wake_word
+{% include "onboarding_select_entry.yaml.j2" %}
+
+text_sensor:
+{% include "ota_text_sensor_entries.yaml.j2" %}
+
+button:
+  - platform: template
+    name: "Тест динамика (4 с) 🔊"
+    id: speaker_test_button
+    icon: "mdi:volume-high"
+    on_press:
+      - script.execute: stop_wake_word
+      - voice_assistant.start:
+      - delay: 4s
+      - voice_assistant.stop:
+      - script.execute: start_wake_word
+      - logger.log: "Тест MAX98357A: сессия Assist 4 с."
+
+  - platform: template
+    name: "Тест микрофона (10 с) 🎤"
+    id: mic_test_button
+    icon: "mdi:microphone-settings"
+    on_press:
+      - logger.log: "Тест INMP441: говорите 10 с, поток уходит в HA."
+      - script.execute: stop_wake_word
+      - voice_assistant.start:
+      - delay: 10s
+      - voice_assistant.stop:
+      - script.execute: start_wake_word
+{% include "ota_button_entries.yaml.j2" %}

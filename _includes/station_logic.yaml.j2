@@ -1,64 +1,232 @@
-# --- Бизнес-логика SmartStation: I2S, Assist, кнопки теста ---
+# =============================================================================
+# БИЗНЕС-ЛОГИКА SmartStation — голосовой сателлит Assist (5 фаз ТЗ)
+# -----------------------------------------------------------------------------
+# Фаза 1: Wi‑Fi/API (runtime) + ожидание, LED тускло/выкл, прослушивание wake.
+# Фаза 2: Активация — micro_wake_word (локально) | use_wake_word (HA/openWakeWord) | кнопка.
+# Фаза 3: I2S INMP441 → поток в HA, LED «слушаю», VAD/тишина, без STT на устройстве.
+# Фаза 4: STT / Intent / TTS — только на сервере Home Assistant.
+# Фаза 5: TTS-чанки → MAX98357A, LED «говорю», возврат в фазу 1.
+# OTA/SETUP — maintenance.yaml.j2
+# =============================================================================
+{% set _bp = board_profile | default({}) %}
+{% set i2s_lrclk = _bp.get("station_i2s_lrclk", "GPIO3") %}
+{% set i2s_bclk = _bp.get("station_i2s_bclk", "GPIO2") %}
+{% set i2s_dout = _bp.get("station_i2s_dout", "GPIO1") %}
+{% set i2s_din = _bp.get("station_i2s_din", "GPIO6") %}
+{% set btn_pin = _bp.get("station_action_button", "GPIO9") %}
+{% set led_pin = station_led_pin | default(status_led_pin | default("GPIO8")) %}
 
+# --- Аудио: INMP441 (вход) + MAX98357A (выход), общая I2S-шина ----------------
 i2s_audio:
   - id: i2s_bus
-    i2s_lrclk_pin: {{ speaker_lrclk | default("GPIO3") }}
-    i2s_bclk_pin: {{ speaker_bclk | default("GPIO2") }}
-
-speaker:
-  - platform: i2s_audio
-    id: speaker_id
-    i2s_audio_id: i2s_bus
-    i2s_dout_pin: {{ speaker_dout | default("GPIO1") }}
-    dac_type: external
+    i2s_lrclk_pin: {{ i2s_lrclk }}
+    i2s_bclk_pin: {{ i2s_bclk }}
 
 microphone:
   - platform: i2s_audio
     id: microphone_id
     i2s_audio_id: i2s_bus
-    i2s_din_pin: {{ mic_din | default("GPIO6") }}
+    i2s_din_pin: {{ i2s_din }}
     adc_type: external
     pdm: false
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    channel: left
+    correct_dc_offset: true
 
+speaker:
+  - platform: i2s_audio
+    id: speaker_id
+    i2s_audio_id: i2s_bus
+    i2s_dout_pin: {{ i2s_dout }}
+    dac_type: external
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    channel: mono
+    buffer_duration: 60ms
+
+# --- Индикация фаз (вместо status_led — PWM/эффекты) ---------------------------
+output:
+  - platform: ledc
+    id: station_led_output
+    pin: {{ led_pin }}
+    inverted: true
+
+light:
+  - platform: monochromatic
+    id: station_led
+    name: "Статус станции"
+    disabled_by_default: true
+    entity_category: diagnostic
+    output: station_led_output
+    gamma_correct: 0
+    default_transition_length: 0s
+    effects:
+      - pulse:
+          name: "Слушаю (медленно)"
+          transition_length: 250ms
+          update_interval: 250ms
+          min_brightness: 40%
+          max_brightness: 100%
+      - pulse:
+          name: "Запись (быстро)"
+          transition_length: 100ms
+          update_interval: 100ms
+          min_brightness: 50%
+          max_brightness: 100%
+
+# --- Фазы 2–5: voice_assistant + micro_wake_word --------------------------------
 voice_assistant:
   id: va
-  microphone: microphone_id
+  microphone:
+    microphone: microphone_id
+    channels: 0
+    gain_factor: 4
+  micro_wake_word: mww
   speaker: speaker_id
   noise_suppression_level: 2
   auto_gain: 31dBFS
   volume_multiplier: 2.0
-  on_error:
-    - logger.log:
-        format: "Voice Assistant Error!"
-        level: ERROR
+  conversation_timeout: 300s
   on_client_connected:
-    - logger.log: "Voice Assistant client connected to Home Assistant"
+    - logger.log: "Фаза 1: подключён к Home Assistant, ожидание wake-word"
+    - delay: 2s
+    - script.execute: start_wake_word
   on_client_disconnected:
-    - logger.log: "Voice Assistant client disconnected"
-  on_tts_start:
-    - logger.log: "Voice Assistant: Speaking..."
+    - logger.log: "Фаза 1: отключён от Home Assistant"
+    - script.execute: stop_wake_word
+    - script.execute: reset_led
+  on_wake_word_detected:
+    - logger.log: "Фаза 2Б: wake-word на стороне HA"
+  on_listening:
+    - logger.log: "Фаза 3: слушаю команду"
+    - light.turn_on:
+        id: station_led
+        brightness: 80%
+        effect: "Слушаю (медленно)"
+  on_stt_vad_start:
+    - light.turn_on:
+        id: station_led
+        brightness: 100%
+        effect: "Запись (быстро)"
+  on_stt_vad_end:
+    - logger.log: "Фаза 3: конец речи (VAD), ожидание ответа HA"
+    - light.turn_on:
+        id: station_led
+        brightness: 70%
+        effect: none
   on_stt_end:
     - logger.log:
-        format: "Voice Assistant: Recognition finished: %s"
+        format: "Фаза 4 (на HA): распознано «%s»"
         args: [ "x.c_str()" ]
+  on_tts_start:
+    - logger.log:
+        format: "Фаза 5: озвучивание «%s»"
+        args: [ "x.c_str()" ]
+    - light.turn_on:
+        id: station_led
+        brightness: 100%
+        effect: none
+  on_tts_stream_start:
+    - logger.log: "Фаза 5: поток TTS на MAX98357A"
+  on_tts_stream_end:
+    - logger.log: "Фаза 5: поток TTS завершён"
+  on_end:
+    - wait_until:
+        condition:
+          not:
+            speaker.is_playing:
+        timeout: 1s
+    - script.execute: start_wake_word
+    - script.execute: reset_led
+  on_idle:
+    - script.execute: reset_led
+  on_error:
+    - logger.log:
+        format: "Voice Assistant: %s — %s"
+        args: [ "code.c_str()", "message.c_str()" ]
+        level: ERROR
+    - light.turn_on:
+        id: station_led
+        brightness: 100%
+        effect: none
+    - delay: 2s
+    - script.execute: reset_led
+    - script.execute: start_wake_word
 
-binary_sensor:
-  - platform: gpio
-    pin:
-      number: {{ action_button | default("GPIO9") }}
-      inverted: true
-      mode: INPUT_PULLUP
-    name: "Кнопка активации"
-    on_click:
-      - if:
-          condition:
-            voice_assistant.is_running:
-          then:
-            - voice_assistant.stop:
-          else:
-            - voice_assistant.start:
+micro_wake_word:
+  id: mww
+  microphone:
+    microphone: microphone_id
+    channels: 0
+    gain_factor: 4
+  vad:
+  models:
+    - model: okay_nabu
+      id: mww_okay_nabu
+    - model: hey_jarvis
+      id: mww_hey_jarvis
+  on_wake_word_detected:
+    - logger.log: "Фаза 2А: локальный wake-word"
+    - script.execute: stop_wake_word
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
 
 script:
+  - id: reset_led
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return id(wake_word_engine_location).current_option() == "На устройстве";
+          then:
+            - light.turn_on:
+                id: station_led
+                brightness: 15%
+                effect: none
+          else:
+            - light.turn_off: station_led
+
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - lambda: |-
+                  return id(wake_word_engine_location).current_option() == "На устройстве";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - micro_wake_word.start:
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - lambda: |-
+                  return id(wake_word_engine_location).current_option() == "В Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(true);
+            - voice_assistant.start_continuous:
+      - script.execute: reset_led
+
+  - id: stop_wake_word
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return id(wake_word_engine_location).current_option() == "В Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - voice_assistant.stop:
+      - if:
+          condition:
+            lambda: |-
+              return id(wake_word_engine_location).current_option() == "На устройстве";
+          then:
+            - micro_wake_word.stop:
+
 {% if chip_family != "esp8266" %}
 {% include "logic_ota_platform.yaml.j2" %}
 {% endif %}
@@ -67,3 +235,31 @@ interval:
 {% if chip_family != "esp8266" %}
 {% include "interval_ota_sync.yaml.j2" %}
 {% endif %}
+
+# --- Фаза 2В: физическая кнопка на корпусе ------------------------------------
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: {{ btn_pin }}
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Кнопка активации"
+    icon: "mdi:record-circle-outline"
+    on_multi_click:
+      - timing:
+          - ON for at least 50ms
+          - OFF for at least 50ms
+        then:
+          - if:
+              condition:
+                voice_assistant.is_running:
+              then:
+                - voice_assistant.stop:
+                - script.execute: start_wake_word
+              else:
+                - script.execute: stop_wake_word
+                - voice_assistant.start:
+                - light.turn_on:
+                    id: station_led
+                    brightness: 80%
+                    effect: "Слушаю (медленно)"
