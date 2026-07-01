@@ -38,14 +38,17 @@
 {% include "labels_common.yaml.j2" %}
 {% set github_owner = github_owner | default("mihazzzold") %}
 {% set ota_base_url = ota_base_url | default("https://ota-s3.m3zold-lab.tech/firmware") %}
-{% set chip_family = chip_family | default("esp32") %}
 {% set _bp = board_profile | default({}) %}
+{% set chip_family = chip_family | default(_bp.get("chip_family", "esp32")) %}
 {% set ota_hw = (ota_channel | default(_bp.get("ota_channel") | default("esp32c6"))) | string %}
 {% set ota_project = ota_project | default(github_owner ~ ".espHome-SmartStation." ~ ota_hw) %}
 {% set wifi_ap_prefix = "station" %}
 {% set zigbee_enabled = false %}
 {% set logger_level = "DEBUG" %}
+{# USB_SERIAL_JTAG доступен только на C3/C6/S3. На classic ESP32 — UART0 (default). #}
+{% if (ota_hw | string) in ("esp32c3", "esp32c6", "esp32s3") %}
 {% set logger_hardware_uart = "USB_SERIAL_JTAG" %}
+{% endif %}
 {# LED управляется в station_logic (ledc), не через status_led в runtime (flasher всё равно передаёт status_led_pin из профиля) #}
 {% set use_status_led = false %}
 {% set station_led_pin = station_led_pin | default(_bp.get("status_led_pin") | default("GPIO8")) %}

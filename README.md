@@ -4,6 +4,16 @@
 
 Голосовой сателлит Home Assistant **Assist**: **INMP441** + **MAX98357A** на **ESP32-C3** или **ESP32-C6** SuperMini.
 
+## 🧩 Матрица поддержки плат
+
+| Плата | Wi-Fi (ESPHome) | Zigbee (ESP-IDF) | Причина ограничения |
+| --- | --- | --- | --- |
+| **ESP32** (classic, WROOM-32) | ❌ | ❌ | `_includes/runtime.yaml.j2` жёстко прописывает `variant: esp32c6` (требует доработки шаблона) |
+| **ESP32-C3** SuperMini | ✅ | ❌ | нет 802.15.4 |
+| **ESP32-C6** SuperMini | ✅ (рекомендуется) | ❌ | Assist требует Wi-Fi, в Zigbee нет смысла |
+| **ESP32-H2** | ❌ | ❌ | нет Wi-Fi 802.11 + нет смысла в Zigbee для voice |
+| **ESP8266** NodeMCU | ❌ | ❌ | не хватает RAM/Flash для Assist pipeline |
+
 | Плата | Профиль `flasher` | OTA на сервере |
 |-------|-------------------|----------------|
 | ESP32-C3 SuperMini | `esp32c3-supermini` | `mihazzzold.espHome-SmartStation.esp32c3` |

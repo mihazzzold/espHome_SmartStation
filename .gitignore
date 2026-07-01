@@ -1,14 +1,5 @@
-# ESPHome gitignore settings
-.esphome/
-.*.yaml
-*.yaml.sh
-*.yaml.bat
-secrets.yaml
-# Локальный экспорт для ESPHome / HA (генерируйте сами)
-espHome_SmartStation.esphome-web.yaml
-latest.bin
-latest.json
-latest.txt
-ota-espHome_SmartStation.bin
-serial-espHome_SmartStation.bin
-firmwares/
+# Gitignore settings for ESPHome
+# This is an example and may include too much for your use-case.
+# You can modify this file to suit your needs.
+/.esphome/
+/secrets.yaml

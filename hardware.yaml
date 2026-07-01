@@ -1,0 +1,61 @@
+version: 1
+title: "Smart Station (Assist / I2S)"
+notes: |
+  Поддерживаемые платы: ESP32-C3, ESP32-C6.
+  ESP8266 НЕ поддерживается: не хватает RAM/Flash для voice assist pipeline.
+  ESP32 (classic) НЕ поддерживается обычной сборкой: runtime.yaml.j2 SmartStation
+  жёстко прописывает variant: esp32c6 (требует доработки шаблона для classic).
+  ESP32-H2 НЕ поддерживается: нет Wi-Fi 802.11.
+boards:
+  esp32c3-supermini:
+    title: "ESP32-C3 SuperMini"
+    flash_connect: |
+      USB-C к ПК. Те же линии I2S, что в профиле C3 (см. boards/esp32c3-supermini.yaml).
+    connections:
+      - pin: GPIO2
+        role: i2s
+        label: "I2S BCLK"
+        connect: "BCLK → GPIO2"
+      - pin: GPIO3
+        role: i2s
+        label: "I2S LRCLK"
+        connect: "LRCLK → GPIO3"
+      - pin: GPIO1
+        role: i2s
+        label: "I2S DOUT"
+        connect: "DIN MAX98357A ← GPIO1"
+      - pin: GPIO6
+        role: i2s
+        label: "I2S DIN"
+        connect: "DOUT INMP441 → GPIO6"
+      - pin: GPIO9
+        role: switch
+        label: "Кнопка"
+        connect: "Кнопка → GPIO9"
+
+  esp32c6-supermini:
+    title: "ESP32-C6 SuperMini (рекомендуется)"
+    flash_connect: |
+      USB-C к ПК. Микрофон INMP441 и усилитель MAX98357A — общая шина I2S (BCLK, LRCLK).
+      Питание модулей 3.3 V. Не путайте DIN/DOUT.
+    connections:
+      - pin: GPIO2
+        role: i2s
+        label: "I2S BCLK"
+        connect: "BCLK микрофона и усилителя → GPIO2"
+      - pin: GPIO3
+        role: i2s
+        label: "I2S LRCLK (WS)"
+        connect: "LRCLK → GPIO3"
+      - pin: GPIO1
+        role: i2s
+        label: "I2S DOUT (в DAC)"
+        connect: "DIN MAX98357A ← GPIO1 (DOUT ESP)"
+      - pin: GPIO6
+        role: i2s
+        label: "I2S DIN (от микрофона)"
+        connect: "DOUT INMP441 → GPIO6 (DIN ESP)"
+      - pin: GPIO9
+        role: switch
+        label: "Кнопка действия"
+        connect: "Кнопка Assist → GPIO9 и GND"

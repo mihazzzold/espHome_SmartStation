@@ -1,0 +1,299 @@
+# --- ESPHome Flasher: сгенерированный YAML ---
+# yaml_build_version: 20260505-001923
+# rendered_at: 2026-05-05T00:19:23
+# template: espHome_SmartStation.yaml.j2
+# serial: esp-1773399090-569
+# ---
+
+
+
+
+
+
+
+
+
+# Манифест OTA на ota.m3zold-lab.tech публичный — GitHub PAT в заголовках не используем
+# (substitutions + ${...} в globals давали сырой ghp_... в C++ и ошибку компиляции).
+
+esphome:
+  name: "esp-1773399090-569"
+  friendly_name: "espHome SmartStation #esp-1773399090-569"
+  project:
+    name: "mihazzzold.espHome-SmartStation"
+    version: "0.2.0-alpha.4"
+
+# dashboard_import закомментирован, так как ESPHome 2026.2.4 может иметь проблемы с валидацией J2 URL 🛠️
+# dashboard_import:
+#   package_import_url: "<set your config URL here if dashboard import is needed>"
+#   import_full_config: false
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+  ap:
+    ssid: "esp-1773399090-569-setup"
+    password: !secret ap_password
+  reboot_timeout: 0s
+  on_connect:
+    - script.execute: check_firmware_update
+
+captive_portal:
+
+logger:
+  level: DEBUG
+  hardware_uart: USB_SERIAL_JTAG
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+  - platform: http_request
+
+# Настройка I2S аудио (Общий порт для входа и выхода на ESP32-C3)
+i2s_audio:
+  - id: i2s_bus
+    i2s_lrclk_pin: GPIO3
+    i2s_bclk_pin: GPIO2
+
+# Динамик (ЦАП PCM5102A)
+speaker:
+  - platform: i2s_audio
+    id: speaker_id
+    i2s_audio_id: i2s_bus
+    i2s_dout_pin: GPIO1
+    dac_type: external
+    # PCM5102A не требует MCLK (может генерировать его сам из BCLK)
+
+# Микрофон (INMP441)
+microphone:
+  - platform: i2s_audio
+    id: microphone_id
+    i2s_audio_id: i2s_bus
+    i2s_din_pin: GPIO6
+    adc_type: external
+    pdm: false
+    # INMP441 работает в обычном режиме I2S, используя общие шины BCK/LRCK с ЦАП
+
+# Голосовой ассистент 🎙️
+voice_assistant:
+  id: va
+  microphone: microphone_id
+  speaker: speaker_id
+  # Использование Home Assistant для распознавания (STT/TTS/Wake Word) 🤖
+  # Необходима конфигурация в Home Assistant (Assist) 🏠
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_error:
+    - logger.log:
+        format: "Voice Assistant Error!"
+        level: ERROR
+  on_client_connected:
+    - logger.log: "Voice Assistant client connected to Home Assistant"
+  on_client_disconnected:
+    - logger.log: "Voice Assistant client disconnected"
+  on_tts_start:
+    - logger.log: "Voice Assistant: Speaking..."
+  on_stt_end:
+    - logger.log:
+        format: "Voice Assistant: Recognition finished: %s"
+        args: [ "x.c_str()" ]
+
+  # Настройка HTTP клиента для обновлений
+http_request:
+  id: http_client
+  timeout: 10s
+  useragent: "ESPHome/0.2.0-alpha.4"
+  verify_ssl: true
+
+# Проверка OTA: HTTP GET публичного latest.json + script install_firmware_update (http_request flash).
+
+globals:
+  - id: available_version
+    type: std::string
+    restore_value: no
+    initial_value: '"0.2.0-alpha.4"'
+  - id: update_url
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+
+# Опционально: кнопка для активации (Push-to-talk)
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO9 # Кнопка BOOT на SuperMini (иногда требует внешнюю подтяжку)
+      inverted: true
+      mode: INPUT_PULLUP
+    name: "Кнопка активации"
+    on_click:
+      - if:
+          condition:
+            voice_assistant.is_running:
+          then:
+            - voice_assistant.stop:
+          else:
+            - voice_assistant.start:
+
+  - platform: template
+    name: "New Firmware Available"
+    id: update_available_sensor
+    icon: "mdi:update"
+    entity_category: diagnostic
+    lambda: |-
+      return id(available_version) != "0.2.0-alpha.4";
+
+# Дополнительно: Индикатор состояния (светодиод на плате)
+light:
+  - platform: status_led
+    id: status_led_light
+    name: "Статус LED"
+    pin:
+      number: GPIO8 # Светодиод на C3 SuperMini
+      inverted: true
+
+text_sensor:
+  - platform: template
+    id: serial_num_sensor
+    name: "Serial Number"
+    entity_category: diagnostic
+    lambda: 'return {"esp-1773399090-569"};'
+    update_interval: never
+
+  - platform: template
+    id: current_ver_sensor
+    name: "Current Firmware Version"
+    entity_category: diagnostic
+    lambda: 'return {"0.2.0-alpha.4"};'
+    update_interval: never
+
+  - platform: template
+    id: available_version_sensor
+    name: "Available Firmware Version"
+    entity_category: diagnostic
+    lambda: 'return id(available_version);'
+
+  - platform: template
+    id: changelog_sensor
+    name: "Firmware Changelog"
+    entity_category: diagnostic
+
+sensor:
+  - platform: internal_temperature
+    name: "Internal Temperature"
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+# Настройка прокси для прошивки (помогает при прямом скачивании в HA)
+# Включается только если ESPHome собран с поддержкой ota: platform: http_request
+
+script:
+  - id: check_firmware_update
+    then:
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - http_request.get:
+                url: "https://ota.m3zold-lab.tech/firmware/mihazzzold.espHome-SmartStation/latest.json"
+                on_response:
+                  - lambda: |-
+                      ESP_LOGI("ota", "Response received from update server. Status: %d", response->status_code);
+                      if (response->status_code != 200) {
+                        ESP_LOGE("ota", "Non-OK status from server: %d", response->status_code);
+                        return;
+                      }
+                      
+                      std::string body;
+                      uint8_t buffer[256];
+                      int len;
+                      while ((len = response->read(buffer, sizeof(buffer))) > 0) {
+                        body.append((char*)buffer, len);
+                      }
+                      
+                      auto json = json::parse_json(body);
+                      if (json.as< JsonVariant >().is< JsonObject >()) {
+                        auto root = json.as< JsonObject >();
+                        if (root.containsKey("version")) {
+                          std::string version = root["version"].as< std::string >();
+                          id(available_version) = version;
+                          ESP_LOGI("ota", "Available version: %s", version.c_str());
+                          
+                          if (root.containsKey("url")) {
+                            id(update_url) = root["url"].as< std::string >();
+                          }
+                          if (root.containsKey("changelog")) {
+                            id(changelog_sensor).publish_state(root["changelog"].as< std::string >());
+                          }
+                        }
+                      } else {
+                        ESP_LOGE("ota", "Failed to parse update JSON (possibly auth error or invalid format)");
+                      }
+
+  - id: install_firmware_update
+    then:
+      - if:
+          condition:
+            lambda: 'return id(update_url) != "";'
+          then:
+            - ota.http_request.flash:
+                url: !lambda 'return id(update_url);'
+                md5_url: !lambda 'return id(update_url) + ".md5";'
+
+interval:
+  # В тестовых релизах проверяем обновления чаще.
+  - interval: 1h
+    then:
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - script.execute: check_firmware_update
+
+button:
+  - platform: template
+    id: check_update_button
+    name: "Check for updates 🔍"
+    icon: "mdi:update"
+    on_press:
+      - script.execute: check_firmware_update
+
+  - platform: template
+    id: install_update_button
+    name: "Install update ⚡"
+    icon: "mdi:download"
+    entity_category: config
+    on_press:
+      - script.execute: install_firmware_update
+
+  - platform: template
+    name: "Speaker Test (Beep) 🔊"
+    id: speaker_test_button
+    icon: "mdi:volume-high"
+    on_press:
+      - voice_assistant.start_continuous:
+      - delay: 4s
+      - voice_assistant.stop:
+      - logger.log: "Запущен тест динамика: активация VA на 4 секунды. Если звука нет, проверьте пины I2S и питание ЦАП."
+
+  - platform: template
+    name: "Mic Test (Log) 🎤"
+    id: mic_test_button
+    icon: "mdi:microphone-settings"
+    on_press:
+      - logger.log: "Тестирование микрофона (10 сек): громко говорите в микрофон и следите за логами 'Audio level'"
+      - voice_assistant.start:
+      - delay: 10s
+      - voice_assistant.stop:

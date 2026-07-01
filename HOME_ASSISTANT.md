@@ -2,10 +2,12 @@
 
 Голосовой **сателлит** Assist: ESP32 **не выполняет** STT/Intent/TTS — только микрофон, динамик, wake-word (опционально) и кнопка. Всё «понимание» команд — на **Home Assistant**. Пайка и прошивка — в [`SETUP.md`](SETUP.md), обзор прошивки — [`README.md`](README.md).
 
-| Плата | OTA manifest |
+| Плата | OTA manifest (Wi-Fi / ESPHome) |
 |-------|----------------|
 | ESP32-C3 | `https://ota-s3.m3zold-lab.tech/firmware/mihazzzold.espHome-SmartStation.esp32c3/manifest.json` |
 | ESP32-C6 | `https://ota-s3.m3zold-lab.tech/firmware/mihazzzold.espHome-SmartStation.esp32c6/manifest.json` |
+
+> 🚫 **SmartStation не существует в Zigbee варианте**: Assist требует Wi-Fi + связь с HA pipeline. ESP8266 / ESP32-classic / ESP32-H2 не поддерживаются (см. таблицу в [`README.md`](README.md)).
 
 ---
 
